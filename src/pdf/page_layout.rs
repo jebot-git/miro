@@ -1,5 +1,14 @@
 use anyhow::{anyhow, Result};
-use iced::Size;
+#[derive(Debug, Clone, Copy)]
+pub struct Size<T> {
+    pub width: T,
+    pub height: T,
+}
+impl<T> Size<T> {
+    pub fn new(width: T, height: T) -> Self {
+        Self { width, height }
+    }
+}
 use serde::{Deserialize, Serialize};
 use strum::EnumString;
 

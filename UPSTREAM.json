@@ -1,0 +1,8 @@
+{
+  "upstream": "https://github.com/vincent-uden/miro",
+  "base_revision": "d35322c47d53903638558162a5e3153f32dfdc37",
+  "base_branch": "master",
+  "frontend": "FLTK 1.4.5; native DomeD bitmap runtime",
+  "document_engine": "upstream MuPDF Rust bindings 0.8.0",
+  "verified_latest_master_utc": "2026-10-23"
+}

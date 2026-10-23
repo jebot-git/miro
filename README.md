@@ -1,166 +1,61 @@
-# miro
+# Miro for DomeD
 
-A native pdf viewer for Windows, macOS and Linux (Wayland/X11) with configurable keybindings.
+A native FLTK PDF viewer forked from [vincent-uden/miro](https://github.com/vincent-uden/miro), based on the latest upstream `master` at the start of this port: `d35322c47d53903638558162a5e3153f32dfdc37` (19 October 2026). The maintained fork is [jebot-git/miro](https://github.com/jebot-git/miro).
 
-![An image of the pdf reader](/assets/screenshot.png)
+The interface uses DomeD's native FLTK toolkit, FreeType and Fontconfig. Interface text uses raw BDF bitmap fonts, including system and user fonts, native strikes and integer 1×/2× enlargement. Family, face, size, scale, colours and theme follow the live DomeD appearance settings. A raw Unifont 16 BDF is supplied for use outside DomeD. There are no bundled TTF interface fonts, Iced or Pango dependencies. MuPDF renders the PDF's own text and embedded fonts as authored; the session font does not replace document content.
 
-## Features
-- Dark mode (both for the interface and the pdf)
-- Vim-like keybindings (by default)
-- Configuration file for key bindings (in case you don't like Vim bindings)
-- Mouse controls
-- Multiple pdfs in tabs
-- Cli arg for opening pdfs from the terminal
-- Automatic hot-reloading of any viewed pdf (especially useful when writing anything that compiles into pdfs like Latex/Typst/etc.)
-- Text copying in documents
-- Internal links (such as a table of contents)
-- External links (email, websites, etc. copies on click)
-- Bookmarks
-- Jumplist
-- Optional RPC server to control the viewer from another program
-- Print via the default web browser
-- Open links using keyboard controls
-- Fullscreen
-- A presentation mode that hides all UI
-- Shows recently opened files
-- Search through documents using plain text or regular expressions
-- Read comments and show annotations
-- An overview mode showing many pages in a grid for quick navigation
+The viewer supports multiple tabs, continuous single/double/title-page layouts, overview, presentation, fullscreen, page and document rotation, zoom, links, outlines, annotation comments, text copying, plain/regex search, bookmarks, recent files, reload on file changes, URL/stdin input, saving copies and system printing. Bookmarks and recent files retain upstream's JSON format. It reads the existing `miro.conf` binding format, including modes, multi-key chords and mouse bindings. The native menu exports the actual commands, enabled states, toggle/radio states and configured shortcuts to DomeD over DBusMenu and the Wayland appmenu protocol (X11 properties on X11). An in-window menu is available outside DomeD.
 
-## Configuration
+PDF tiles render on a dedicated MuPDF worker and upload to GL textures. Panning and presentation composite those textures on the GPU; normal drawing does not read the framebuffer back. Search and PDF loading do not run on the UI thread.
 
-The configuration file is located at `~/.config/miro-pdf/miro.conf` (or `.config/miro-pdf/miro.conf` in the home directory of your operating system). An example configuration file is located at `/assets/default.conf` which contains all the default bindings for the program.
+## Build and install
 
-Every binding that is possible is bound at least once in the default configuration file.
+Linux with the **DomeD BDF-enabled FLTK 1.4.5** toolkit is required. Stock FLTK does not provide the bitmap-only native text path used here. Install/build the toolkit from [fltk-vr](https://github.com/jebot-git/fltk-vr) first. The upstream Windows/Iced and Nix packaging does not apply to this frontend.
 
-### Configuration File Format
+Build dependencies: CMake 3.22+, C++17 compiler, Rust 1.88+ with edition 2024 support, Cargo, Clang/libclang development headers for MuPDF's bindgen, pkg-config, nlohmann-json, FreeType/Fontconfig, zlib, libpng, OpenGL, GLib/GIO, X11, Wayland development files and `wayland-scanner`. Python 3 and `unzip` are also needed for MuPDF’s bundled output templates. A C/C++ toolchain is needed to build MuPDF. This checkout was validated with Rust 1.93.1.
 
-The configuration file uses a simple text format with three types of commands and comments:
-
-#### Key Bindings
-```
-Bind <key_sequence> <mode> <action>
-```
-
-Key sequences can be:
-- Single keys: `j`, `k`, `h`, `l`
-- Modified keys: `Ctrl+r`, `Shift+Tab`
-- Key chords (multiple keys): `"Z Z"` (quotes required for sequences with spaces)
-
-All available actions are bound in the example config file. If you need a more exact view of the syntax it is documented in the [keybinds-rs](https://github.com/rhysd/keybinds-rs/blob/main/doc/binding_syntax.md) crate.
-
-The mode is one of several modes available, all of them are bound in the default config. Refer to it for the complete definition. Some examples are Normal, Presentation and Overview.
-
-> [!WARNING]
-> There is **no** inheritance of bindings between modes. All keys need to be bound for each mode separately. Thus, forgetting to bind `TogglePresentation` inside the presentation mode will leave you unable to exit to normal mode.
-
-#### Mouse Bindings
-```
-MouseBind <mouse_input> <mode> <action>
-```
-
-Mouse inputs can be:
-- Basic buttons: `MouseLeft`, `MouseRight`, `MouseMiddle`, `MouseBack`, `MouseForward`
-- With modifiers: `Ctrl+MouseLeft`, `Shift+MouseRight`
-
-All available actions are bound in the example config file.
-
-#### Settings
-```
-Set <setting> <value>
-```
-
-Available settings:
-- `Rpc <True|False>` - Enable/disable RPC server
-- `RpcPort <number>` - Set RPC server port
-- `TrackpadSensitivity <float>` - Set a multiplier on panning with a trackpad
-
-#### Default Settings
-```
-Set <setting> <value>
-```
-
-Default settings apply only at application startup. They can later be toggled with key bindings.
-
-Available default settings:
-- `DarkModePdf <True|False>` - Enable/disable dark mode rendering of the PDF
-- `DarkModeUi <True|False>` - Enable/disable dark mode for the UI
-- `OpenSidebar <True|False>` - Open sidebar
-- `PageBorders <True|False>` - Enable/disable page borders
-
-#### Comments and Empty Lines
-```
-# This is a comment
-# Comments start with # and are ignored during parsing
-
-# Empty lines are also ignored
-```
-
-### Error Handling
-
-The configuration parser provides detailed error messages with line numbers when parsing fails. Errors on one line don't prevent parsing of other lines
-
-Example error output:
-```
-Configuration parsing errors:
-  Line 3: Unknown command: InvalidCommand
-  Line 5: Unknown action: InvalidAction
-  Line 7: Invalid port number: 'not_a_number'. Must be a valid integer
-```
-
-## Installation
-
-### Pre-compiled binary
-Head over to [releases](https://github.com/vincent-uden/miro/releases) and download the latest binary for your platform, then place it somewhere in your path.
-
-#### Nix Cachix Binary Cache
-```nix
-nix.settings = {
-  substituters = [
-    "https://miro-pdf.cachix.org"
-    # Others...
-  ];
-  trusted-public-keys = [
-    "miro-pdf.cachix.org-1:4XzXt3PjR8lGUo00nhzAGQLdRa73iPQNTRD5tfIZf4k="
-    # Others...
-  ];
-};
-```
-
-### Crates.io
-This is pretty much the same as the following option, but doesn't require cloning the repo. See [building from source](#building-from-source) for possible complications when compiling for Windows. I've had **no** problems compiling on Linux thus far.
 ```sh
-cargo install miro-pdf
+scripts/build.sh
+ctest --test-dir build --output-on-failure
+cmake --install build --prefix "$HOME/.local"
+fc-cache -f "$HOME/.local/share/fonts"
+update-desktop-database "$HOME/.local/share/applications"
+build/miro-pdf document.pdf
 ```
 
-### Building from source
-On linux, the commands below would clone the repository, compile the project and copy the resulting binary to `/usr/bin/`.
-```sh
-git clone https://github.com/vincent-uden/miro.git
-cd miro
-cargo r --release
-cp ./target/release/miro-pdf /usr/bin/miro-pdf
+`FLTK_DIR` defaults to `/opt/fltk-vr/toolkit/share/fltk`; override it for a different toolkit prefix. `CARGO_HOME`, `CARGO_TARGET_DIR`, `MIRO_BUILD_DIR`, `MIRO_BUILD_JOBS` and `BINDGEN_EXTRA_CLANG_ARGS` are supported. CMake runs `cargo check` before building the Rust library. It derives the compiler's builtin include directory when bindgen needs it; an installed Clang resource directory can instead be supplied through `BINDGEN_EXTRA_CLANG_ARGS`.
+
+The installed application is `miro-pdf`, with the same desktop ID and PDF MIME type as upstream. Installation does not change your default PDF application or overwrite `miro.conf`.
+
+## Controls and configuration
+
+- Ctrl+O opens PDFs; Ctrl+W closes a tab; Ctrl+Tab / Ctrl+Shift+Tab switch tabs.
+- Ctrl+F opens Find; Enter searches; F3 / Shift+F3 select matches. The Regex checkbox selects regex search.
+- Ctrl+G goes to a page; PgUp / PgDn scroll; Ctrl+8 fits a page; Ctrl+9 fits width; Ctrl+0 selects actual size; Ctrl++ / Ctrl+- zoom.
+- F11 toggles fullscreen; F10 toggles presentation; Enter opens overview. Click a thumbnail to navigate.
+- Left-drag pans; Shift+left-drag selects text; Ctrl+C copies; Ctrl+A copies the current page's text; Ctrl+wheel zooms. Clicking a link follows it.
+- Ctrl+B adds a bookmark; Ctrl+Shift+B opens the sidebar. The sidebar shows Contents, Bookmarks, Search or Comments. Select a comment to read its full text.
+- Ctrl+1 / Ctrl+2 / Ctrl+3 select page layouts. `[` / `]` rotate a page; `{` / `}` rotate the document.
+- Vim keys and multi-key bindings remain available; see [assets/default.conf](assets/default.conf).
+- Super shortcuts belong to the compositor. Super+X switches desktop/XR input focus; Miro does not bind or consume it.
+
+Configuration lives in `$XDG_CONFIG_HOME/miro-pdf` (normally `~/.config/miro-pdf`). User bindings replace the same key and mode from the defaults. Invalid lines are reported and later valid lines still load. For example:
+
+```text
+Bind Ctrl+f Normal OpenSearch
+Bind "g g" Normal ZoomHome
+MouseBind Shift+MouseLeft Normal Selection
+Set Rpc False
 ```
-#### Windows
 
-On Windows, the same rough process *should* work, but often doesn't. I highly recommend downloading a precompiled binary for Windows. The problem lies in compiling the crate `mupdf-sys` which requires [MSVC](https://visualstudio.microsoft.com/vs/features/cplusplus/).
+DomeD owns the interface appearance; `ToggleDarkModeUi` directs DomeD users to its Appearance menu. Outside DomeD it toggles the local interface palette. `ToggleDarkModePdf` is a per-document rendering override; otherwise the document background follows the session's light/dark palette. The legacy `DarkModeUi` and `DarkModePdf` settings are accepted for configuration compatibility; session appearance takes precedence. Application positions/layouts are saved in `fltk-state.json`, separately from `miro.conf`. Print uses `lp` and the configured system default printer; remote PDFs should be saved locally first.
 
-The Visual Studio project embedded in this crate requires Visual Studio 2019 which isn't available for downloading anymore, but can [optionally be compiled using Visual Studio 2022](https://github.com/messense/mupdf-rs/pull/125). Even with this option, the build might just not work sometimes due to issues with the Windows 10/11 SDK kits which I have not managed to solve.
+RPC is off by default. With `Set Rpc True`, the upstream JSON POST interface listens on loopback port 7890 (`RpcPort` to change it). Supported messages are `OpenFile`, `CloseFile`, `ToggleDarkModeUi`, and `ToggleDarkModePdf`; file messages use `{"message":{"type":"OpenFile","data":{"path":"/path/file.pdf"}}}`. `RpcAllowLan True` explicitly enables network binding. Requests and the queue are bounded.
 
-However, I've managed to get compilation working in github actions which is what produces the release binaries which do function correctly on Windows systems.
+## Development and licensing
 
-#### Linux
+The Rust library exposes document metadata, tiled rendering, text, search, links, comments, configuration and persistence through a small C ABI. Every MuPDF document lives entirely on the render worker thread. Static MuPDF symbols are hidden at link time so its private FreeType cannot override FLTK/Fontconfig’s bitmap-capable FreeType. Native code is in `fltk/`; toolkit-independent upstream geometry, layout and search algorithms remain in `src/`.
 
-Mupdf-rs requries headers for fontconfig. The packages are:
+Run `cargo check --locked --release`, `cargo test --locked --release`, the CMake build and [scripts/test-ui.py](scripts/test-ui.py) / [scripts/test-dome.py](scripts/test-dome.py) after a rendering or integration change. The UI test uses private displays/configuration and does not alter the active desktop. Diagnostic `--report`, `--capture`, `--script` and `--quit-after-ms` options support repeatable integration tests.
 
-- `libfontconfig1-dev` on Ubuntu/Debian
-- `fontconfig-devel` on Fedora
-- `fontconfig` on Arch and derivatives
-
-Building on linux also requires some hidden dependencies that you probably already have.
-- `clang`
-- `unzip`
-
-#### macOS
-
-While I don't test the software for macOS since I don't own a mac. It should work although only supporting building from source or crates.io. No binary releases are made.
+Miro and the new frontend are AGPL-3.0. Shared DomeD integration helpers retain their MIT license; see [fltk/LICENSE.MIT](fltk/LICENSE.MIT) and [NOTICE](NOTICE). Unifont's license and font embedding exception are in [assets/fonts/COPYING.unifont](assets/fonts/COPYING.unifont). Upstream application history remains in Git; [UPSTREAM.json](UPSTREAM.json) records the port's base.

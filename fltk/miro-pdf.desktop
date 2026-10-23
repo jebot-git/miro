@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Miro
+GenericName=PDF Viewer
+Comment=Native bitmap PDF viewer for DomeD
+Exec=miro-pdf %U
+Icon=miro-pdf
+Terminal=false
+Categories=Office;Viewer;
+MimeType=application/pdf;
+StartupWMClass=miro-pdf

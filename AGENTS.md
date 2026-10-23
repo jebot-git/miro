@@ -1,11 +1,18 @@
 # AGENTS.md - Miro PDF Viewer Development Guide
 
 ## Build/Test Commands
-- `cargo build` - Build the project
-- `cargo run` - Run the application
-- `cargo test` - Run all tests
-- `cargo test <test_name>` - Run a specific test
-- `cargo check` - Check code without building, use this before each build since it is a lot faster
+- `cargo check --locked --release` - Check the toolkit-independent Rust core before every build
+- `scripts/build.sh` - Build the Rust static library and native FLTK frontend with CMake
+- `build/miro-pdf file.pdf` - Run the viewer
+- `cargo test --locked --release` - Run document, configuration, search, geometry and layout tests
+- `ctest --test-dir build --output-on-failure` - Run registered core tests
+- `uv run --with python-xlib --with pillow --with dbus-next scripts/test-ui.py` - Private-display native integration tests
+- `cargo fmt --check` - Rust formatting
+
+This fork's frontend is Linux FLTK (DomeD's BDF-only 1.4.5 toolkit); Iced,
+Windows and upstream Nix packaging are not used. Preserve upstream provenance
+in UPSTREAM.json when rebasing. Never access a MuPDF handle off its worker
+thread. Super chords are owned by DomeD. UI fonts must remain raw BDF.
 
 ## Code Style Guidelines
 - Use `snake_case` for variables, functions, and modules
@@ -20,7 +27,7 @@
 - Implement `Default` trait where appropriate
 - Use `EnumString` derive for string-to-enum conversion
 - Prefer `PathBuf` over `&str` for file paths
-- Use `tokio::sync` primitives for async communication
+- Use the existing worker queue for native asynchronous communication
 - Structure modules with `mod.rs` files for organization
 - Use the `debug!`, `info!` and `error!` from `tracing` for printing and logging
 

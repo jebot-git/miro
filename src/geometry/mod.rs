@@ -150,51 +150,6 @@ impl From<Rect<f64>> for Rect<f32> {
     }
 }
 
-impl From<Vector<f32>> for iced::Point {
-    fn from(val: Vector<f32>) -> Self {
-        iced::Point::new(val.x, val.y)
-    }
-}
-
-impl From<Vector<f32>> for iced::Vector {
-    fn from(val: Vector<f32>) -> Self {
-        iced::Vector::new(val.x, val.y)
-    }
-}
-
-impl From<Vector<f32>> for iced::Size {
-    fn from(val: Vector<f32>) -> Self {
-        iced::Size::new(val.x, val.y)
-    }
-}
-
-impl From<iced::Point> for Vector<f32> {
-    fn from(value: iced::Point) -> Self {
-        Self {
-            x: value.x,
-            y: value.y,
-        }
-    }
-}
-
-impl From<iced::Vector> for Vector<f32> {
-    fn from(value: iced::Vector) -> Self {
-        Self {
-            x: value.x,
-            y: value.y,
-        }
-    }
-}
-
-impl From<iced::Size> for Vector<f32> {
-    fn from(value: iced::Size) -> Self {
-        Self {
-            x: value.width,
-            y: value.height,
-        }
-    }
-}
-
 impl From<mupdf::Size> for Vector<f32> {
     fn from(value: mupdf::Size) -> Self {
         Self {
@@ -373,17 +328,6 @@ impl From<Rect<f32>> for Rect<i32> {
     }
 }
 
-impl From<iced::Rectangle> for Rect<f32> {
-    fn from(value: iced::Rectangle) -> Self {
-        let top_left: Vector<f32> = value.position().into();
-        let size: Vector<f32> = value.size().into();
-        Self {
-            x0: top_left,
-            x1: top_left + size,
-        }
-    }
-}
-
 impl From<mupdf::Rect> for Rect<f32> {
     fn from(value: mupdf::Rect) -> Self {
         Self {
@@ -440,20 +384,6 @@ impl From<mupdf::IRect> for Rect<f32> {
                 x: value.x1 as f32,
                 y: value.y1 as f32,
             },
-        }
-    }
-}
-
-impl<T> From<Rect<T>> for iced::Rectangle<T>
-where
-    T: Num + Copy,
-{
-    fn from(val: Rect<T>) -> Self {
-        iced::Rectangle {
-            x: val.x0.x,
-            y: val.x0.y,
-            width: val.x1.x - val.x0.x,
-            height: val.x1.y - val.x0.y,
         }
     }
 }

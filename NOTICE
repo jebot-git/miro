@@ -1,0 +1,14 @@
+Miro upstream: https://github.com/vincent-uden/miro
+Base: d35322c47d53903638558162a5e3153f32dfdc37 (AGPL-3.0)
+Fork: https://github.com/jebot-git/miro
+
+fltk/{fltk_appearance.h,bdf_font.hpp,gpu-window.h,suite-icons.h}:
+DomeD/fltk-vr native integration helpers, MIT, from jebot-git/dome-compositor.
+fltk/{desktop-menu.h,desktop-menu.cpp,desktop-menu.cmake,appmenu.xml}:
+DomeD native DBusMenu/Wayland integration, MIT, from jebot-git/fsv-xr.
+The original MIT notice is reproduced in fltk/LICENSE.MIT.
+The BDF enlargement algorithm adapts Francesco149/bdf2x (Unlicense);
+fltk/bdf2x/upstream.json and UNLICENSE retain attribution and provenance.
+
+assets/fonts/unifont-17.0.04.bdf:
+GNU Unifont 17.0.04; see assets/fonts/COPYING.unifont.

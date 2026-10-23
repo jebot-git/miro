@@ -1,16 +1,10 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use crate::{
-    app::AppMessage,
-    config::MouseAction,
-    geometry::{Rect, Vector},
-    pdf::page_layout::PageLayoutKind,
-};
+use crate::geometry::Rect;
 use serde::{Deserialize, Serialize};
 use strum::EnumString;
 
 pub mod page_layout;
-pub mod widget;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, EnumString, Default, PartialEq, Eq)]
 pub enum SearchMethod {
@@ -79,7 +73,6 @@ pub fn find_search_matches(
     let mut byte_ranges: Vec<(usize, usize)> = vec![];
     match method {
         SearchMethod::PlainText => {
-            let _span = tracy_client::span!("Plain text search");
             for (chunk_idx, &chunk_end) in page_ends.iter().enumerate() {
                 if cancel.load(Ordering::Relaxed) {
                     return vec![];
@@ -92,7 +85,6 @@ pub fn find_search_matches(
             }
         }
         SearchMethod::Regex => {
-            let _span = tracy_client::span!("Regex search");
             if let Ok(re) = regex::Regex::new(needle) {
                 for (chunk_idx, &chunk_end) in page_ends.iter().enumerate() {
                     if cancel.load(Ordering::Relaxed) {
@@ -183,69 +175,90 @@ pub fn merge_search_rects(char_rects: &[(usize, Rect<f32>)]) -> Vec<(usize, Rect
     merged
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, EnumString, Default)]
-pub enum PdfMessage {
-    NextPage,
-    PreviousPage,
-    PageUp,
-    PageDown,
-    HalfPageUp,
-    HalfPageDown,
-    SetPage(usize),
-    SetTranslation(Vector<f64>),
-    /// Translation and scale
-    SetLocation(Vector<f64>, f32),
-    SetLayout(PageLayoutKind),
-    /// Leave overview mode and restore the layout that was active before it was
-    /// opened. When `true`, also navigate to the selected overview page.
-    ExitOverview(bool),
-    RotatePageClockwise,
-    RotatePageCounterClockwise,
-    RotateAllPagesClockwise,
-    RotateAllPagesCounterClockwise,
-    ZoomIn,
-    ZoomOut,
-    ZoomHome,
-    ZoomFit,
-    /// Move some distance in Document space
-    Move(Vector<f64>),
-    MouseMoved(Vector<f32>),
-    /// A [MouseAction] and whether it's pressed (true) or released (false)
-    MouseAction(MouseAction, bool),
-    ToggleLinkHitboxes,
-    /// Activate link by index
-    ActivateLink(usize),
-    /// Close/hide link hitboxes
-    CloseLinkHitboxes,
-    FileChanged,
-    PrintPdf,
-    HighlightSearchResults,
-    HideSearchResults,
-    JumpToSearchResult(usize),
-    NextSearchResult,
-    PreviousSearchResult,
-    UpdateSearchNeedle(String),
-    SetSearchMethod(SearchMethod),
-    ToggleSearchMethod,
-    /// Close the comment popup
-    CloseComment,
-    #[strum(disabled)]
-    #[serde(skip)]
-    CommentPopupHovered(bool),
-    #[strum(disabled)]
-    #[serde(skip)]
-    ToggleCommentCollapse(usize),
-    #[strum(disabled)]
-    #[serde(skip)]
-    SearchResultsReady(Vec<SearchMatch>, u64),
-    /// Takes the comment id, NOT its index
-    HighlightComment(usize),
-    #[default]
-    None,
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::geometry::Vector;
 
-impl From<PdfMessage> for AppMessage {
-    fn from(value: PdfMessage) -> Self {
-        AppMessage::PdfMessage(value)
+    fn boxes(text: &str, split: usize) -> Vec<(usize, usize, Rect<f32>)> {
+        text.char_indices()
+            .enumerate()
+            .map(|(column, (byte, _))| {
+                (
+                    usize::from(byte >= split),
+                    byte,
+                    Rect::from_pos_size(
+                        Vector::new(column as f32 * 8.0, 0.0),
+                        Vector::new(8.0, 16.0),
+                    ),
+                )
+            })
+            .collect()
+    }
+    #[test]
+    fn unicode_search_maps_bytes_to_correct_page_boxes() {
+        let text = "one žluťoučký two žluťoučký";
+        let matches = find_search_matches(
+            text,
+            "žluťoučký",
+            SearchMethod::PlainText,
+            &boxes(text, 17),
+            &AtomicBool::new(false),
+        );
+        assert_eq!(matches.len(), 2);
+        assert_eq!(
+            &text[matches[0].start_byte..matches[0].end_byte],
+            "žluťoučký"
+        );
+        assert_eq!(matches[0].pages, 0..1);
+        assert_eq!(matches[1].pages, 1..2);
+        assert!(matches[1].rects[0].1.x0.x > matches[0].rects[0].1.x0.x);
+    }
+    #[test]
+    fn page_chunk_overlap_deduplicates_cross_page_match() {
+        let text = "before cross\npage after";
+        let matches = find_search_matches(
+            text,
+            "cross\npage",
+            SearchMethod::PlainText,
+            &boxes(text, 13),
+            &AtomicBool::new(false),
+        );
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].pages, 0..2);
+        assert_eq!(matches[0].rects.len(), 2);
+    }
+    #[test]
+    fn regex_cancel_and_invalid_expressions() {
+        let text = "alpha 123 beta 456";
+        let b = boxes(text, usize::MAX);
+        let matches = find_search_matches(
+            text,
+            r"\d+",
+            SearchMethod::Regex,
+            &b,
+            &AtomicBool::new(false),
+        );
+        assert_eq!(
+            matches
+                .iter()
+                .map(|m| &text[m.start_byte..m.end_byte])
+                .collect::<Vec<_>>(),
+            ["123", "456"]
+        );
+        assert!(
+            find_search_matches(text, "(", SearchMethod::Regex, &b, &AtomicBool::new(false))
+                .is_empty()
+        );
+        assert!(
+            find_search_matches(
+                text,
+                "alpha",
+                SearchMethod::PlainText,
+                &b,
+                &AtomicBool::new(true)
+            )
+            .is_empty()
+        );
     }
 }

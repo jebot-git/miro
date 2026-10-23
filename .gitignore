@@ -11,3 +11,9 @@ result*
 
 # Added by cargo
 /target
+
+/artifacts
+/build-*
+
+__pycache__/
+*.pyc
